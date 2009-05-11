@@ -1,6 +1,6 @@
 package File::Strmode;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use strict;
 use warnings;
@@ -10,15 +10,26 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(strmode);
 
 use Carp;
-use Fcntl qw(:mode);
+
+BEGIN {
+    require Fcntl;
+    require constant;
+    eval { Fcntl->import($_); 1 } || constant->import($_, 0)
+	for qw(S_IFDIR S_IFCHR S_IFBLK S_IFREG S_IFLNK S_IFMT S_IRUSR
+	       S_IWUSR S_IXUSR S_ISUID S_IRGRP S_IWGRP S_IXGRP S_ISGID
+	       S_IROTH S_IWOTH S_IXOTH S_ISVTX S_IFSOCK S_IFIFO);
+}
 
 my %type = (  S_IFDIR, 'd',
 	      S_IFCHR, 'c',
 	      S_IFBLK, 'b',
 	      S_IFREG, '-',
-	      S_IFLNK, 'l');
-eval { $type{S_IFSOCK()} = 's' };
-eval { $type{S_IFIFO()} = 'p' };
+	      S_IFLNK, 'l',
+	      S_IFSOCK, 's',
+	      S_IFIFO, 'p' );
+
+delete $type{0}; # if some type constant is not defined for the
+                 # running OS, it will end at this slot.
 
 my %cache;
 
@@ -27,29 +38,29 @@ sub strmode {
     return undef unless defined $mode;
     $cache{$mode} ||= do {
 	my $str = $type{$mode & S_IFMT} || '?';
-	$str .= ($mode & S_IRUSR ? 'r' : '-');
-	$str .= ($mode & S_IWUSR ? 'w' : '-');
+	$str .= (($mode & S_IRUSR) ? 'r' : '-');
+	$str .= (($mode & S_IWUSR) ? 'w' : '-');
 	if ($mode & S_IXUSR) {
-	    $str .= ($mode & S_ISUID ? 's' : 'x');
+	    $str .= (($mode & S_ISUID) ? 's' : 'x');
 	}
 	else {
-	    $str .= ($mode & S_ISUID ? 'S' : '-');
+	    $str .= (($mode & S_ISUID) ? 'S' : '-');
 	}
-	$str .= ($mode & S_IRGRP ? 'r' : '-');
-	$str .= ($mode & S_IWGRP ? 'w' : '-');
-	if ($mode & S_IXGRP) {
-	    $str .= ($mode & S_ISGID ? 's' : 'x');
+	$str .= (($mode & S_IRGRP) ? 'r' : '-');
+	$str .= (($mode & S_IWGRP) ? 'w' : '-');
+	if (($mode & S_IXGRP)) {
+	    $str .= (($mode & S_ISGID) ? 's' : 'x');
 	}
 	else {
-	    $str .= ($mode & S_ISGID ? 'S' : '-');
+	    $str .= (($mode & S_ISGID) ? 'S' : '-');
 	}
-	$str .= ($mode & S_IROTH ? 'r' : '-');
-	$str .= ($mode & S_IWOTH ? 'w' : '-');
+	$str .= (($mode & S_IROTH) ? 'r' : '-');
+	$str .= (($mode & S_IWOTH) ? 'w' : '-');
 	if ($mode & S_IXOTH) {
-	    $str .= ($mode & S_ISVTX ? 't' : 'x');
+	    $str .= (($mode & S_ISVTX) ? 't' : 'x');
 	}
 	else {
-	    $str .= ($mode & S_ISVTX ? 'T' : '-');
+	    $str .= (($mode & S_ISVTX) ? 'T' : '-');
 	}
 	$str .= ' '; # will be a '+' if ACL's implemented
 	$str
